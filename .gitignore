@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.env
+.env.*
+
+# Agent instructions
+# agents/*.yaml
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+*.log
