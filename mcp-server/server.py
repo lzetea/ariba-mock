@@ -15,6 +15,8 @@ from mcp.types import Tool, TextContent
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 from starlette.responses import JSONResponse
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 import uvicorn
 
 # Service URLs (configurable via environment variables)
@@ -407,19 +409,356 @@ async def root(request):
         "endpoints": {
             "sse": "/sse",
             "messages": "/messages",
-            "health": "/health"
+            "health": "/health",
+            "rest_api": "/api/v1"
         }
     })
+
+
+# ============== REST API for Copilot Studio ==============
+# These endpoints expose the same functionality as MCP tools but via standard REST
+
+async def api_list_tools(request):
+    """List available tools - for Copilot Studio discovery"""
+    tools = await list_tools()
+    return JSONResponse([{
+        "name": t.name,
+        "description": t.description,
+        "parameters": t.inputSchema
+    } for t in tools])
+
+async def api_dashboard(request):
+    """Get dashboard summary"""
+    result = await call_mock_api("/api/dashboard/summary")
+    return JSONResponse(result)
+
+async def api_suppliers(request):
+    """List suppliers with optional filters"""
+    params = {}
+    if request.query_params.get("status"):
+        params["status"] = request.query_params["status"]
+    if request.query_params.get("category"):
+        params["category"] = request.query_params["category"]
+    result = await call_mock_api("/api/suppliers", params if params else None)
+    return JSONResponse(result)
+
+async def api_supplier_detail(request):
+    """Get supplier by ID"""
+    supplier_id = request.path_params["supplier_id"]
+    result = await call_mock_api(f"/api/suppliers/{supplier_id}")
+    return JSONResponse(result)
+
+async def api_purchase_orders(request):
+    """List purchase orders with optional filters"""
+    params = {}
+    if request.query_params.get("status"):
+        params["status"] = request.query_params["status"]
+    if request.query_params.get("supplier_id"):
+        params["supplier_id"] = request.query_params["supplier_id"]
+    result = await call_mock_api("/api/purchase-orders", params if params else None)
+    return JSONResponse(result)
+
+async def api_purchase_order_detail(request):
+    """Get purchase order by ID"""
+    po_id = request.path_params["po_id"]
+    result = await call_mock_api(f"/api/purchase-orders/{po_id}")
+    return JSONResponse(result)
+
+async def api_requisitions(request):
+    """List requisitions with optional filters"""
+    params = {}
+    if request.query_params.get("status"):
+        params["status"] = request.query_params["status"]
+    if request.query_params.get("requester"):
+        params["requester"] = request.query_params["requester"]
+    result = await call_mock_api("/api/requisitions", params if params else None)
+    return JSONResponse(result)
+
+async def api_requisition_detail(request):
+    """Get requisition by ID"""
+    req_id = request.path_params["req_id"]
+    result = await call_mock_api(f"/api/requisitions/{req_id}")
+    return JSONResponse(result)
+
+async def api_invoices(request):
+    """List invoices with optional filters"""
+    params = {}
+    if request.query_params.get("status"):
+        params["status"] = request.query_params["status"]
+    if request.query_params.get("po_number"):
+        params["po_number"] = request.query_params["po_number"]
+    result = await call_mock_api("/api/invoices", params if params else None)
+    return JSONResponse(result)
+
+async def api_invoice_detail(request):
+    """Get invoice by ID"""
+    invoice_id = request.path_params["invoice_id"]
+    result = await call_mock_api(f"/api/invoices/{invoice_id}")
+    return JSONResponse(result)
+
+async def api_contracts(request):
+    """List contracts with optional filters"""
+    params = {}
+    if request.query_params.get("status"):
+        params["status"] = request.query_params["status"]
+    if request.query_params.get("supplier_name"):
+        params["supplier_name"] = request.query_params["supplier_name"]
+    result = await call_mock_api("/api/contracts", params if params else None)
+    return JSONResponse(result)
+
+async def api_contract_detail(request):
+    """Get contract by ID"""
+    contract_id = request.path_params["contract_id"]
+    result = await call_mock_api(f"/api/contracts/{contract_id}")
+    return JSONResponse(result)
+
+async def api_proposals(request):
+    """List proposals with optional filters"""
+    params = {}
+    if request.query_params.get("rfp_id"):
+        params["rfp_id"] = request.query_params["rfp_id"]
+    if request.query_params.get("supplier_id"):
+        params["supplier_id"] = request.query_params["supplier_id"]
+    if request.query_params.get("status"):
+        params["status"] = request.query_params["status"]
+    result = await call_mock_api("/api/proposals", params if params else None)
+    return JSONResponse(result)
+
+async def api_proposal_detail(request):
+    """Get proposal by ID"""
+    proposal_id = request.path_params["proposal_id"]
+    result = await call_mock_api(f"/api/proposals/{proposal_id}")
+    return JSONResponse(result)
+
+async def api_rfps(request):
+    """List RFPs with optional filters"""
+    params = {}
+    if request.query_params.get("status"):
+        params["status"] = request.query_params["status"]
+    result = await call_mock_api("/api/rfps", params if params else None)
+    return JSONResponse(result)
+
+async def api_rfp_detail(request):
+    """Get RFP by ID"""
+    rfp_id = request.path_params["rfp_id"]
+    result = await call_mock_api(f"/api/rfps/{rfp_id}")
+    return JSONResponse(result)
+
+async def api_risk_score(request):
+    """Get risk score for a supplier"""
+    supplier_id = request.path_params["supplier_id"]
+    result = await call_risk_api(f"/api/risk/score/{supplier_id}")
+    return JSONResponse(result)
+
+async def api_openapi_spec(request):
+    """OpenAPI specification for Copilot Studio"""
+    # Build base URL dynamically from request
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    base_url = f"{scheme}://{host}/api/v1"
+    
+    spec = {
+        "openapi": "3.0.0",
+        "info": {
+            "title": "Ariba MCP API",
+            "version": "1.0.0",
+            "description": "SAP Ariba data and risk assessment API for procurement agents"
+        },
+        "servers": [{"url": base_url}],
+        "paths": {
+            "/dashboard": {
+                "get": {
+                    "operationId": "getDashboard",
+                    "summary": "Get dashboard summary with counts and totals",
+                    "responses": {"200": {"description": "Dashboard summary"}}
+                }
+            },
+            "/suppliers": {
+                "get": {
+                    "operationId": "listSuppliers",
+                    "summary": "List all suppliers",
+                    "parameters": [
+                        {"name": "status", "in": "query", "schema": {"type": "string"}},
+                        {"name": "category", "in": "query", "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "List of suppliers"}}
+                }
+            },
+            "/suppliers/{supplier_id}": {
+                "get": {
+                    "operationId": "getSupplier",
+                    "summary": "Get supplier details",
+                    "parameters": [{"name": "supplier_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "Supplier details"}}
+                }
+            },
+            "/purchase-orders": {
+                "get": {
+                    "operationId": "listPurchaseOrders",
+                    "summary": "List purchase orders",
+                    "parameters": [
+                        {"name": "status", "in": "query", "schema": {"type": "string"}},
+                        {"name": "supplier_id", "in": "query", "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "List of purchase orders"}}
+                }
+            },
+            "/purchase-orders/{po_id}": {
+                "get": {
+                    "operationId": "getPurchaseOrder",
+                    "summary": "Get purchase order details",
+                    "parameters": [{"name": "po_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "Purchase order details"}}
+                }
+            },
+            "/invoices": {
+                "get": {
+                    "operationId": "listInvoices",
+                    "summary": "List invoices",
+                    "parameters": [
+                        {"name": "status", "in": "query", "schema": {"type": "string"}},
+                        {"name": "po_number", "in": "query", "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "List of invoices"}}
+                }
+            },
+            "/invoices/{invoice_id}": {
+                "get": {
+                    "operationId": "getInvoice",
+                    "summary": "Get invoice details",
+                    "parameters": [{"name": "invoice_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "Invoice details"}}
+                }
+            },
+            "/contracts": {
+                "get": {
+                    "operationId": "listContracts",
+                    "summary": "List contracts",
+                    "parameters": [
+                        {"name": "status", "in": "query", "schema": {"type": "string"}},
+                        {"name": "supplier_name", "in": "query", "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "List of contracts"}}
+                }
+            },
+            "/contracts/{contract_id}": {
+                "get": {
+                    "operationId": "getContract",
+                    "summary": "Get contract details",
+                    "parameters": [{"name": "contract_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "Contract details"}}
+                }
+            },
+            "/proposals": {
+                "get": {
+                    "operationId": "listProposals",
+                    "summary": "List vendor proposals",
+                    "parameters": [
+                        {"name": "rfp_id", "in": "query", "schema": {"type": "string"}},
+                        {"name": "supplier_id", "in": "query", "schema": {"type": "string"}},
+                        {"name": "status", "in": "query", "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "List of proposals"}}
+                }
+            },
+            "/proposals/{proposal_id}": {
+                "get": {
+                    "operationId": "getProposal",
+                    "summary": "Get proposal details",
+                    "parameters": [{"name": "proposal_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "Proposal details"}}
+                }
+            },
+            "/rfps": {
+                "get": {
+                    "operationId": "listRfps",
+                    "summary": "List RFPs",
+                    "parameters": [{"name": "status", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "List of RFPs"}}
+                }
+            },
+            "/rfps/{rfp_id}": {
+                "get": {
+                    "operationId": "getRfp",
+                    "summary": "Get RFP details with requirements",
+                    "parameters": [{"name": "rfp_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "RFP details"}}
+                }
+            },
+            "/risk/{supplier_id}": {
+                "get": {
+                    "operationId": "getRiskScore",
+                    "summary": "Get risk assessment for a supplier",
+                    "parameters": [{"name": "supplier_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "Risk score and factors"}}
+                }
+            },
+            "/requisitions": {
+                "get": {
+                    "operationId": "listRequisitions",
+                    "summary": "List requisitions",
+                    "parameters": [
+                        {"name": "status", "in": "query", "schema": {"type": "string"}},
+                        {"name": "requester", "in": "query", "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "List of requisitions"}}
+                }
+            },
+            "/requisitions/{req_id}": {
+                "get": {
+                    "operationId": "getRequisition",
+                    "summary": "Get requisition details",
+                    "parameters": [{"name": "req_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "Requisition details"}}
+                }
+            }
+        }
+    }
+    return JSONResponse(spec)
+
+
+# CORS middleware for Copilot Studio
+middleware = [
+    Middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+]
 
 # Starlette app with SSE routes and lifespan for connection warmup
 app = Starlette(
     debug=False,
     lifespan=lifespan,
+    middleware=middleware,
     routes=[
-        Route("/", root),
-        Route("/health", health),
+        Route("/", root, methods=["GET", "HEAD"]),
+        Route("/health", health, methods=["GET", "HEAD"]),
+        # MCP SSE routes (for Foundry)
         Route("/sse", handle_sse),
         Route("/messages", handle_messages, methods=["POST"]),
+        # REST API routes (for Copilot Studio) - explicitly allow GET
+        Route("/api/v1/tools", api_list_tools, methods=["GET"]),
+        Route("/api/v1/openapi.json", api_openapi_spec, methods=["GET"]),
+        Route("/api/v1/dashboard", api_dashboard, methods=["GET"]),
+        Route("/api/v1/suppliers", api_suppliers, methods=["GET"]),
+        Route("/api/v1/suppliers/{supplier_id}", api_supplier_detail, methods=["GET"]),
+        Route("/api/v1/purchase-orders", api_purchase_orders, methods=["GET"]),
+        Route("/api/v1/purchase-orders/{po_id}", api_purchase_order_detail, methods=["GET"]),
+        Route("/api/v1/requisitions", api_requisitions, methods=["GET"]),
+        Route("/api/v1/requisitions/{req_id}", api_requisition_detail, methods=["GET"]),
+        Route("/api/v1/invoices", api_invoices, methods=["GET"]),
+        Route("/api/v1/invoices/{invoice_id}", api_invoice_detail, methods=["GET"]),
+        Route("/api/v1/contracts", api_contracts, methods=["GET"]),
+        Route("/api/v1/contracts/{contract_id}", api_contract_detail, methods=["GET"]),
+        Route("/api/v1/proposals", api_proposals, methods=["GET"]),
+        Route("/api/v1/proposals/{proposal_id}", api_proposal_detail, methods=["GET"]),
+        Route("/api/v1/rfps", api_rfps, methods=["GET"]),
+        Route("/api/v1/rfps/{rfp_id}", api_rfp_detail, methods=["GET"]),
+        Route("/api/v1/risk/{supplier_id}", api_risk_score, methods=["GET"]),
     ]
 )
 

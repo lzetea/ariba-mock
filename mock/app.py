@@ -6,8 +6,10 @@ Provides mock Ariba data via HTTP API.
 import os
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # ============== Mock Data Store ==============
 
@@ -952,6 +954,172 @@ def get_rfp(rfp_id):
     if rfp_id not in rfps_db:
         return jsonify({"error": f"RFP '{rfp_id}' not found"}), 404
     return jsonify(rfps_db[rfp_id])
+
+
+# OpenAPI spec for Copilot Studio
+@app.route("/openapi.json")
+@app.route("/api/openapi.json")
+def openapi_spec():
+    base_url = request.host_url.rstrip('/')
+    spec = {
+        "openapi": "3.0.0",
+        "info": {
+            "title": "SAP Ariba Mock API",
+            "version": "1.0.0",
+            "description": "SAP Ariba mock data API for procurement agents"
+        },
+        "servers": [{"url": base_url}],
+        "paths": {
+            "/health": {
+                "get": {
+                    "operationId": "healthCheck",
+                    "summary": "Health check endpoint",
+                    "responses": {"200": {"description": "Service is healthy"}}
+                }
+            },
+            "/api/dashboard/summary": {
+                "get": {
+                    "operationId": "getDashboard",
+                    "summary": "Get dashboard summary with counts and totals for suppliers, POs, invoices, contracts",
+                    "responses": {"200": {"description": "Dashboard summary"}}
+                }
+            },
+            "/api/suppliers": {
+                "get": {
+                    "operationId": "listSuppliers",
+                    "summary": "List all suppliers in SAP Ariba",
+                    "parameters": [
+                        {"name": "status", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by status (Active, Under Review)"},
+                        {"name": "category", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by category"}
+                    ],
+                    "responses": {"200": {"description": "List of suppliers"}}
+                }
+            },
+            "/api/suppliers/{supplier_id}": {
+                "get": {
+                    "operationId": "getSupplier",
+                    "summary": "Get supplier details by ID",
+                    "parameters": [{"name": "supplier_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Supplier ID (e.g. SUP-1000)"}],
+                    "responses": {"200": {"description": "Supplier details"}}
+                }
+            },
+            "/api/purchase-orders": {
+                "get": {
+                    "operationId": "listPurchaseOrders",
+                    "summary": "List all purchase orders",
+                    "parameters": [
+                        {"name": "status", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by status"},
+                        {"name": "supplier_id", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by supplier ID"}
+                    ],
+                    "responses": {"200": {"description": "List of purchase orders"}}
+                }
+            },
+            "/api/purchase-orders/{po_id}": {
+                "get": {
+                    "operationId": "getPurchaseOrder",
+                    "summary": "Get purchase order details by ID",
+                    "parameters": [{"name": "po_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "PO ID (e.g. PO-2024001)"}],
+                    "responses": {"200": {"description": "Purchase order details"}}
+                }
+            },
+            "/api/requisitions": {
+                "get": {
+                    "operationId": "listRequisitions",
+                    "summary": "List all requisitions",
+                    "parameters": [
+                        {"name": "status", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by status"},
+                        {"name": "requester", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by requester name"}
+                    ],
+                    "responses": {"200": {"description": "List of requisitions"}}
+                }
+            },
+            "/api/requisitions/{req_id}": {
+                "get": {
+                    "operationId": "getRequisition",
+                    "summary": "Get requisition details by ID",
+                    "parameters": [{"name": "req_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Requisition ID"}],
+                    "responses": {"200": {"description": "Requisition details"}}
+                }
+            },
+            "/api/invoices": {
+                "get": {
+                    "operationId": "listInvoices",
+                    "summary": "List all invoices",
+                    "parameters": [
+                        {"name": "status", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by status (Paid, Approved, Under Review)"},
+                        {"name": "po_number", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by PO number"}
+                    ],
+                    "responses": {"200": {"description": "List of invoices"}}
+                }
+            },
+            "/api/invoices/{invoice_id}": {
+                "get": {
+                    "operationId": "getInvoice",
+                    "summary": "Get invoice details by ID",
+                    "parameters": [{"name": "invoice_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Invoice ID"}],
+                    "responses": {"200": {"description": "Invoice details"}}
+                }
+            },
+            "/api/contracts": {
+                "get": {
+                    "operationId": "listContracts",
+                    "summary": "List all contracts",
+                    "parameters": [
+                        {"name": "status", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by status (Active, Expired)"},
+                        {"name": "supplier_name", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by supplier name"}
+                    ],
+                    "responses": {"200": {"description": "List of contracts"}}
+                }
+            },
+            "/api/contracts/{contract_id}": {
+                "get": {
+                    "operationId": "getContract",
+                    "summary": "Get contract details by ID",
+                    "parameters": [{"name": "contract_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Contract ID"}],
+                    "responses": {"200": {"description": "Contract details"}}
+                }
+            },
+            "/api/proposals": {
+                "get": {
+                    "operationId": "listProposals",
+                    "summary": "List vendor proposals with pricing, SLA, and compliance details",
+                    "parameters": [
+                        {"name": "rfp_id", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by RFP ID"},
+                        {"name": "supplier_id", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by supplier ID"},
+                        {"name": "status", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by status"}
+                    ],
+                    "responses": {"200": {"description": "List of proposals"}}
+                }
+            },
+            "/api/proposals/{proposal_id}": {
+                "get": {
+                    "operationId": "getProposal",
+                    "summary": "Get proposal details including pricing, SLA, compliance, and functional coverage",
+                    "parameters": [{"name": "proposal_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Proposal ID"}],
+                    "responses": {"200": {"description": "Proposal details"}}
+                }
+            },
+            "/api/rfps": {
+                "get": {
+                    "operationId": "listRfps",
+                    "summary": "List all RFPs with requirements",
+                    "parameters": [
+                        {"name": "status", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Filter by status (Open, Closed)"}
+                    ],
+                    "responses": {"200": {"description": "List of RFPs"}}
+                }
+            },
+            "/api/rfps/{rfp_id}": {
+                "get": {
+                    "operationId": "getRfp",
+                    "summary": "Get RFP details with all requirements and weights",
+                    "parameters": [{"name": "rfp_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "RFP ID"}],
+                    "responses": {"200": {"description": "RFP details"}}
+                }
+            }
+        }
+    }
+    return jsonify(spec)
 
 
 if __name__ == "__main__":

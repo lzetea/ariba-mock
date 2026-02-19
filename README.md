@@ -95,6 +95,28 @@ Invoke-RestMethod http://localhost:8081/api/risk/score/SUP-1000
 
 # List all risk scores
 Invoke-RestMethod http://localhost:8081/api/risk/scores
+
+# Get high-risk suppliers only
+Invoke-RestMethod http://localhost:8081/api/risk/high-risk
+```
+
+### Test the MCP Server REST API
+
+```powershell
+# Service discovery
+Invoke-RestMethod http://localhost:8082/
+
+# List available tools
+Invoke-RestMethod http://localhost:8082/api/v1/tools
+
+# Dashboard via REST
+Invoke-RestMethod http://localhost:8082/api/v1/dashboard
+
+# Suppliers via REST
+Invoke-RestMethod http://localhost:8082/api/v1/suppliers
+
+# OpenAPI spec
+Invoke-RestMethod http://localhost:8082/api/v1/openapi.json
 ```
 
 ## Deploy to Azure Container Apps
@@ -121,10 +143,15 @@ az containerapp create --name ariba-mcp --resource-group <rg> --environment <env
 
 ### Connect AI agent to MCP server on ACA
 
-The MCP server exposes HTTP/SSE endpoints for remote connections:
+The MCP server exposes two interfaces:
+1. **MCP (SSE)** — for Foundry agents and MCP-compatible clients
+2. **REST API** — for Copilot Studio and standard HTTP clients
+
+#### MCP Endpoints (Foundry)
 
 | Endpoint | Description |
 |----------|-------------|
+| `GET /` | Service discovery (lists all available endpoint paths) |
 | `GET /health` | Health check |
 | `GET /sse` | SSE connection endpoint |
 | `POST /messages` | Message handling endpoint |
@@ -136,3 +163,41 @@ The MCP server exposes HTTP/SSE endpoints for remote connections:
 # Test MCP server health
 Invoke-RestMethod https://ariba-mcp.<env>.azurecontainerapps.io/health
 ```
+
+#### REST API for Copilot Studio
+
+The MCP server also exposes a full REST API under `/api/v1/` for integration with **Copilot Studio** and other HTTP-based consumers. These endpoints mirror the MCP tools but are accessible via standard HTTP GET requests.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/tools` | List all available tools (for discovery) |
+| `GET /api/v1/openapi.json` | OpenAPI 3.0 specification (auto-generated) |
+| `GET /api/v1/dashboard` | Dashboard summary |
+| `GET /api/v1/suppliers` | List suppliers (query: `status`, `category`) |
+| `GET /api/v1/suppliers/{supplier_id}` | Get supplier by ID |
+| `GET /api/v1/purchase-orders` | List POs (query: `status`, `supplier_id`) |
+| `GET /api/v1/purchase-orders/{po_id}` | Get PO by ID |
+| `GET /api/v1/requisitions` | List requisitions (query: `status`, `requester`) |
+| `GET /api/v1/requisitions/{req_id}` | Get requisition by ID |
+| `GET /api/v1/invoices` | List invoices (query: `status`, `po_number`) |
+| `GET /api/v1/invoices/{invoice_id}` | Get invoice by ID |
+| `GET /api/v1/contracts` | List contracts (query: `status`, `supplier_name`) |
+| `GET /api/v1/contracts/{contract_id}` | Get contract by ID |
+| `GET /api/v1/proposals` | List proposals (query: `rfp_id`, `supplier_id`, `status`) |
+| `GET /api/v1/proposals/{proposal_id}` | Get proposal by ID |
+| `GET /api/v1/rfps` | List RFPs (query: `status`) |
+| `GET /api/v1/rfps/{rfp_id}` | Get RFP by ID |
+| `GET /api/v1/risk/{supplier_id}` | Get risk score for a supplier |
+
+**For Copilot Studio**, import the OpenAPI spec at:
+- **OpenAPI URL**: `https://ariba-mcp.<env>.azurecontainerapps.io/api/v1/openapi.json`
+
+```powershell
+# Test REST API
+Invoke-RestMethod https://ariba-mcp.<env>.azurecontainerapps.io/api/v1/dashboard
+
+# Get OpenAPI spec
+Invoke-RestMethod https://ariba-mcp.<env>.azurecontainerapps.io/api/v1/openapi.json
+```
+
+> **Note:** CORS is enabled on all REST endpoints (`*` origins) to support browser-based integrations.
